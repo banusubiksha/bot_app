@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { GiftedChat, IMessage, MessageProps } from 'react-native-gifted-chat';
-import { View, Text, TouchableOpacity, StyleSheet, TextInput } from 'react-native';
-import CustomMessage from './CustomMessage';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Button } from 'react-native';
+import DocumentPicker from 'react-native-document-picker';
 
-const qualifications=['B.E', 'B.Tech', 'B.Sc', 'M.E', 'M.Tech', 'M.Sc', 'PhD'];
+const qualifications = ['B.E', 'B.Tech', 'B.Sc', 'M.E', 'M.Tech', 'M.Sc', 'PhD'];
 
-const isValidName=(name:string):boolean=>/^[A-Za-z]+$/.test(name);
-const isValidPhoneNumber=(phone:string):boolean=>/^\d{10}$/.test(phone);
+const isValidName = (name: string): boolean => /^[A-Za-z]+$/.test(name);
+const isValidPhoneNumber = (phone: string): boolean => /^\d{10}$/.test(phone);
 
 const ChatScreen = () => {
   const [messages, setMessages] = useState<IMessage[]>([]);
@@ -18,12 +18,17 @@ const ChatScreen = () => {
     about: '',
     skills: '',
   });
+const [editMode, setEditMode] = useState<boolean>(false);
+const [editField, setEditField] = useState<string | null>(null);
+
   const [showQualificationMenu, setShowQualificationMenu] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [inputError, setInputError] = useState<{ [key: string]: boolean }>({
-    name:false,
-    phone:false,
+    name: false,
+    phone: false,
   });
+  const [profilePhoto, setProfilePhoto] = useState<string | undefined>(undefined);
+  const [pdfDocument, setPdfDocument] = useState<string | undefined>(undefined);
 
   const steps = [
     'Welcome! Please tell me your name.',
@@ -31,12 +36,16 @@ const ChatScreen = () => {
     'Enter your phone number.',
     'Tell me a bit about yourself.',
     'What are your skills?',
+    'Please upload a profile photo.',
+    'Please upload a document (PDF only).',
+    'Thank you! You can now review and save your information.',
   ];
 
   const handleSend = (newMessages: IMessage[]) => {
     const userMessage = newMessages[0].text;
-
-    if (userMessage.trim()==='1') {
+  
+    if (userMessage.trim() === '1') {
+      // Handle reset logic
       setStep(0);
       setUserData({
         name: '',
@@ -49,13 +58,58 @@ const ChatScreen = () => {
       sendBotMessage(steps[0]);
       setShowQualificationMenu(false);
       setErrorMessage('');
+      setProfilePhoto(undefined);
+      setPdfDocument(undefined);
       return;
     }
-
+    if (editMode) {
+      switch (userMessage.trim()) {
+        case '2':
+          setEditField('name');
+          sendBotMessage('Please enter your new name:');
+          setEditMode(false);
+          setStep(0);
+          
+          return;
+        case '3':
+          setEditField('qualification');
+          sendBotMessage('Please enter your new qualification:');
+          setEditMode(false);
+          setStep(1);
+          
+          return;
+          
+        case '4':
+          setEditField('phone');
+          sendBotMessage('Please enter your new phone number:');
+          setEditMode(false);
+          setStep(2);
+          
+          return;
+        case '5':
+          setEditField('about');
+          sendBotMessage('Please enter your new information about yourself:');
+          setEditMode(false);
+          setStep(3);
+          
+          return;
+        case '6':
+          setEditField('skills');
+          sendBotMessage('Please enter your new skills:');
+          setEditMode(false);
+          setStep(4);
+          return;
+        default:
+          sendBotMessage('Invalid option. Please press 1, 2, 3, 4, 5 or 6.');
+          return;
+      }
+    }
+  
+  
     setMessages((previousMessages) =>
       GiftedChat.append(previousMessages, newMessages)
     );
-
+  
     if (step < steps.length) {
       const updatedUserData = { ...userData };
       switch (step) {
@@ -66,11 +120,11 @@ const ChatScreen = () => {
             setStep(1);
             setShowQualificationMenu(true);
             setErrorMessage('');
-            setInputError((prev)=>({...prev, name: false }));
+            setInputError((prev) => ({ ...prev, name: false }));
           } else {
             setErrorMessage('Name must contain only letters.');
             sendBotMessage(errorMessage, true);
-            setInputError((prev)=>({...prev, name: true }));
+            setInputError((prev) => ({ ...prev, name: true }));
           }
           break;
         case 1:
@@ -81,16 +135,15 @@ const ChatScreen = () => {
               setShowQualificationMenu(false);
               setStep(2);
             } else {
-              sendBotMessage('Please choose a valid qualification from the menu.');
+              sendBotMessage('Please select a valid qualification from the list.');
             }
-          } 
+          }
           break;
         case 2:
           if (isValidPhoneNumber(userMessage)) {
             updatedUserData.phone = userMessage;
             setUserData(updatedUserData);
             setStep(3);
-            setInputError((prev) => ({ ...prev, phone: false }));
           } else {
             sendBotMessage('Please enter a valid 10-digit phone number.');
             setInputError((prev) => ({ ...prev, phone: true }));
@@ -101,28 +154,46 @@ const ChatScreen = () => {
             updatedUserData.about = userMessage;
             setUserData(updatedUserData);
             setStep(4);
-          } else {
-            sendBotMessage('Please provide valid information about yourself.');
           }
           break;
         case 4:
           if (userMessage.trim()) {
             updatedUserData.skills = userMessage;
             setUserData(updatedUserData);
-            sendBotMessage('Thank you! For the information you provided:');
-            console.log('User Data:', updatedUserData);
+            sendBotMessage(steps[5]);
             setStep(5);
-          } else {
-            sendBotMessage('Please provide valid information about your skills.');
           }
           break;
+        case 5:
+          if (profilePhoto) {
+            sendBotMessage(steps[6]);
+            setStep(6);
+          }
+          break;
+        case 6:
+          if (pdfDocument) {
+            sendBotMessage(steps[7]);
+            setStep(7);
+          }
+          break;
+        case 7:
+          if (userMessage.trim() === 'Save Information') {
+            const infoMessage = `Name: ${userData.name}\nQualification: ${userData.qualification}\nPhone: ${userData.phone}\nAbout: ${userData.about}\nSkills: ${userData.skills}`;
+            sendBotMessage('Here is the information you provided:');
+            sendBotMessage(infoMessage, true);
+            setStep(8); // Move to a final step or end chat
+          } else if (userMessage.trim() === 'Edit Information') {
+            setEditMode(true);
+            sendBotMessage('Which field would you like to edit? Please choose:\n1. Edit full details \n2. Edit Name\n3. Edit Qualification\n4. Edit Phone Number\n5. Edit About\n6. Edit Skills');
+          }
+            break;
         default:
           sendBotMessage('Thank you for chatting with us!');
           break;
       }
     }
   };
-
+  
   const sendBotMessage = (text: string, isError: boolean = false) => {
     const botReply: IMessage = {
       _id: new Date().getTime(),
@@ -140,6 +211,7 @@ const ChatScreen = () => {
   };
 
   const renderCustomActions = () => {
+    // Render qualification options
     if (step === 1 && showQualificationMenu) {
       return (
         <View style={styles.menuContainer}>
@@ -155,161 +227,172 @@ const ChatScreen = () => {
         </View>
       );
     }
+  
+    // profile photo upload button
+    if (step === 5 && !profilePhoto) {
+      return (
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => pickFile('photo')}
+        >
+          <Text style={styles.menuText}>Upload Profile Photo</Text>
+        </TouchableOpacity>
+      );
+    }
+  
+    //  pdf document upload button
+    if (step === 6 && !pdfDocument) {
+      return (
+        <TouchableOpacity
+          style={styles.menuButton}
+          onPress={() => pickFile('pdf')}
+        >
+          <Text style={styles.menuText}>Upload PDF Document</Text>
+        </TouchableOpacity>
+      );
+    }
+  
     return null;
+  };
+  
+
+  const pickFile = async (type: 'photo' | 'pdf') => {
+    try {
+      const result = await DocumentPicker.pick({
+        type: type === 'photo' ? ['image/jpeg', 'image/png'] : ['application/pdf'],
+      });
+
+      if (result && result.length > 0) {
+        const file = result[0];
+        if (type === 'photo') {
+          setProfilePhoto(file.uri);
+        } else {
+          setPdfDocument(file.uri);
+        }
+        handleSend([{ text: '', user: { _id: 1 }, createdAt: new Date(), _id: new Date().getTime() }]);
+      }
+    } catch (error) {
+      if (DocumentPicker.isCancel(error)) {
+        console.log('User cancelled document picker');
+      } else {
+        console.error('DocumentPicker Error: ', error);
+      }
+    }
   };
 
   useEffect(() => {
-    if (step === 0) {
-      sendBotMessage(steps[0]);
-    } else if (step < steps.length) {
+    if (step < steps.length) {
       sendBotMessage(steps[step]);
     }
   }, [step]);
 
   const renderMessage = (props: MessageProps<IMessage>) => {
     const { currentMessage } = props;
-
+  
     if (!currentMessage) {
       return null;
     }
-
+  
     const isUserMessage = currentMessage.user._id === 1;
-
+    const isStepMessage = steps.includes(currentMessage.text);
+  
     return (
       <View
         style={[
           styles.messageContainer,
-          isUserMessage ? styles.userMessage : styles.botMessage
+          isUserMessage ? styles.userMessage : styles.botMessage,
         ]}
       >
-        <Text
-          style={[
-            styles.messageText,
-            isUserMessage ? styles.userText : styles.botText
-          ]}
-        >
-          {currentMessage.text}
-        </Text>
+        {currentMessage.image && (
+          <Image source={{ uri: currentMessage.image }} style={styles.messageImage} />
+        )}
+        {currentMessage.text && (
+          <Text
+            style={[
+              styles.messageText,
+              isUserMessage ? styles.userMessageText : styles.botMessageText,
+              isStepMessage ? styles.stepMessageText : {},
+            ]}
+          >
+            {currentMessage.text}
+          </Text>
+        )}
+        {(currentMessage.text.includes('Thank you! You can now review and save your information.') ||
+          currentMessage.text.includes('Thank you for chatting with us!')) && (
+          <View style={styles.actionButtonsContainer}>
+            <Button title="Edit Information" onPress={() => handleSend([{ text: 'Edit Information', user: { _id: 1 }, createdAt: new Date(), _id: new Date().getTime() }])} />
+            <Button title="Save Information" onPress={() => handleSend([{ text: 'Save Information', user: { _id: 1 }, createdAt: new Date(), _id: new Date().getTime() }])} />
+          </View>
+        )}
       </View>
     );
   };
 
   return (
-    <View style={styles.container}>
-      <GiftedChat
-        messages={messages}
-        onSend={(newMessages) => handleSend(newMessages)}
-        user={{
-          _id: 1,
-        }}
-        renderActions={renderCustomActions}
-        renderMessage={renderMessage}
-        placeholder="Type a message..."
-        scrollToBottom
-        scrollToBottomComponent={() => (
-          <View style={styles.scrollToBottomButton}>
-            <Text style={styles.scrollToBottomText}>↑</Text>
-          </View>
-        )}
-      />
-      {step === 1 && (
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={[
-              styles.input,
-              inputError.phone ? styles.errorBorder : styles.normalBorder
-            ]}
-            placeholder="Enter your phone number"
-            keyboardType="numeric"
-            maxLength={10}
-            onChangeText={(text) => handleSend([{ text, user: { _id: 1 }, createdAt: new Date(), _id: new Date().getTime() }])}
-          />
-        </View>
-      )}
-    </View>
+    <GiftedChat
+      messages={messages}
+      onSend={handleSend}
+      user={{ _id: 1 }}
+      renderMessage={renderMessage}
+      renderActions={renderCustomActions}
+      onPressAvatar={() => {}}
+      onPressActionButton={() => pickFile('photo')}
+    />
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f4f4f4',
+  messageContainer: {
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 5,
+    marginHorizontal: 10,
+  },
+  userMessage: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#DCF8C6',
+  },
+  botMessage: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+  },
+  messageText: {
+    fontSize: 16,
+  },
+  userMessageText: {
+    color: '#000000',
+  },
+  botMessageText: {
+    color: '#333333',
+  },
+  stepMessageText: {
+    fontWeight: 'bold',
   },
   menuContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 10,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
+    justifyContent: 'space-around',
+    marginVertical: 10,
   },
   menuButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    padding: 10,
+    backgroundColor: '#EFEFEF',
+    borderRadius: 5,
     margin: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
   },
   menuText: {
-    color: '#fff',
     fontSize: 16,
+    color: '#000000',
   },
-  scrollToBottomButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#007bff',
-    borderRadius: 20,
-    margin: 10,
-  },
-  scrollToBottomText: {
-    color: '#fff',
-    fontSize: 20,
-  },
-  messageContainer: {
-    padding: 10,
-    borderRadius: 20,
-    margin: 5,
-    maxWidth: '80%',
-  },
-  userMessage: {
-    backgroundColor: '#007bff',
-    alignSelf: 'flex-end',
-  },
-  botMessage: {
-    backgroundColor: '#e5e5e5',
-    alignSelf: 'flex-start',
-  },
-  messageText: {
-    fontSize: 16,
-    color: '#fff',
-  },
-  userText: {
-    color: '#fff',
-  },
-  botText: {
-    color: '#000',
-  },
-  inputContainer: {
-    padding: 10,
-    backgroundColor: '#fff',
-  },
-  input: {
-    padding: 10,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  errorBorder: {
-    borderColor: 'red',
-  },
-  normalBorder: {
-    borderColor: '#ddd',
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 10,
   },
 });
 
